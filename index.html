@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>省会城市匹配消消乐</title>
+    <style>
+        :root {
+            --china-red: #c03532;
+            --china-blue: #235384;
+            --china-gold: #daa520;
+            --china-green: #2d5c2a;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            background: linear-gradient(to bottom, #e6f7ff, #b3e0ff);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--china-red);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            margin: 20px 0;
+        }
+
+        #gameBoard {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 15px;
+            max-width: 1200px;
+            width: 95%;
+            margin: 20px auto;
+            padding: 10px;
+        }
+
+        .bubble {
+            width: 100px;
+            height: 100px;
+            background: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 
+                0 8px 15px rgba(0,0,0,0.2),
+                inset 0 -5px 15px rgba(0,0,0,0.1);
+            transform: perspective(500px) rotateX(15deg) rotateY(15deg);
+            border: 2px solid rgba(255,255,255,0.3);
+            font-size: 14px;
+            animation: bubbleAppear 0.5s ease-out;
+        }
+
+        @keyframes bubbleAppear {
+            0% { transform: scale(0); }
+            80% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .bubble:hover {
+            transform: perspective(500px) rotateX(5deg) rotateY(5deg) scale(1.15);
+            box-shadow: 0 12px 20px rgba(0,0,0,0.3);
+        }
+
+        .bubble.selected {
+            transform: scale(1.2);
+            box-shadow: 0 0 25px var(--china-gold);
+            z-index: 10;
+        }
+
+        .bubble.matched {
+            animation: matchDisappear 0.6s forwards;
+        }
+
+        @keyframes matchDisappear {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2) rotate(180deg); opacity: 1; }
+            100% { transform: scale(0) rotate(360deg); opacity: 0; }
+        }
+
+        #controlPanel {
+            position: fixed;
+            right: 20px;
+            top: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        button {
+            background: var(--china-blue);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: var(--china-red);
+            transform: scale(1.05);
+        }
+
+        #score {
+            font-size: 24px;
+            color: var(--china-red);
+            margin: 10px 0;
+        }
+
+        #message {
+            min-height: 40px;
+            color: var(--china-green);
+            font-weight: bold;
+        }
+
+        #successMessage {
+            display: none;
+            position: fixed;
+            top: 20%;
+            background: rgba(46, 204, 113, 0.95);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 50px;
+            font-size: 24px;
+            animation: slideDown 0.5s;
+        }
+
+        @keyframes slideDown {
+            from { top: -10%; }
+            to { top: 20%; }
+        }
+
+        @media (max-width: 768px) {
+            #gameBoard { grid-template-columns: repeat(5, 1fr); }
+            .bubble { width: 70px; height: 70px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <h1>省会城市匹配消消乐</h1>
+    <div id="controlPanel">
+        <div id="score">积分：0</div>
+        <button onclick="initGame()">重新开始</button>
+        <div id="message">点击两个泡泡进行匹配！</div>
+    </div>
+    <div id="gameBoard"></div>
+    <div id="successMessage">恭喜你挑战成功！</div>
+
+    <script>
+        const chinaColors = ['#c03532', '#235384', '#2d5c2a', '#daa520', 
+                           '#8a2be2', '#2e8b57', '#cd5c5c', '#4682b4'];
+        let score = 0;
+        let firstSelection = null;
+        let allowClick = true;
+
+        const pairs = {
+            "北京市": "北京",
+            "天津市": "天津",
+            "上海市": "上海",
+            "重庆市": "重庆",
+            "河北省": "石家庄",
+            "山西省": "太原",
+            "辽宁省": "沈阳",
+            "吉林省": "长春",
+            "黑龙江省": "哈尔滨",
+            "江苏省": "南京",
+            "浙江省": "杭州",
+            "安徽省": "合肥",
+            "福建省": "福州",
+            "江西省": "南昌",
+            "山东省": "济南",
+            "河南省": "郑州",
+            "湖北省": "武汉",
+            "湖南省": "长沙",
+            "广东省": "广州",
+            "海南省": "海口",
+            "四川省": "成都",
+            "贵州省": "贵阳",
+            "云南省": "昆明",
+            "陕西省": "西安",
+            "甘肃省": "兰州",
+            "青海省": "西宁",
+            "内蒙古自治区": "呼和浩特",
+            "广西壮族自治区": "南宁",
+            "西藏自治区": "拉萨",
+            "宁夏回族自治区": "银川",
+            "新疆维吾尔自治区": "乌鲁木齐",
+            "香港特别行政区": "香港",
+            "澳门特别行政区": "澳门"
+        };
+
+        function initGame() {
+            score = 0;
+            document.getElementById('score').textContent = `积分：${score}`;
+            document.getElementById('message').textContent = '点击两个泡泡进行匹配！';
+            document.getElementById('successMessage').style.display = 'none';
+            gameBoard.innerHTML = '';
+            
+            // 创建配对数组
+            const items = [];
+            for (const [province, capital] of Object.entries(pairs)) {
+                items.push(province, capital);
+            }
+            
+            // 打乱顺序
+            items.sort(() => Math.random() - 0.5);
+
+            // 创建泡泡
+            items.forEach(item => {
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble';
+                bubble.textContent = item;
+                bubble.style.background = `linear-gradient(145deg, 
+                    ${chinaColors[Math.floor(Math.random()*chinaColors.length)]},
+                    ${chinaColors[Math.floor(Math.random()*chinaColors.length)]})`;
+                bubble.addEventListener('click', handleClick);
+                gameBoard.appendChild(bubble);
+            });
+        }
+
+        function handleClick() {
+            if (!allowClick || this.classList.contains('selected') || 
+                this.classList.contains('matched')) return;
+
+            this.classList.add('selected');
+            
+            if (!firstSelection) {
+                firstSelection = this;
+            } else {
+                allowClick = false;
+                const isMatch = checkMatch(firstSelection, this);
+                
+                setTimeout(() => {
+                    firstSelection.classList.remove('selected');
+                    this.classList.remove('selected');
+                    
+                    if (isMatch) {
+                        handleMatch(firstSelection, this);
+                        checkCompletion();
+                    }
+                    
+                    firstSelection = null;
+                    allowClick = true;
+                }, 800);
+            }
+        }
+
+        function checkMatch(b1, b2) {
+            return pairs[b1.textContent] === b2.textContent || 
+                   pairs[b2.textContent] === b1.textContent;
+        }
+
+        function handleMatch(b1, b2) {
+            b1.classList.add('matched');
+            b2.classList.add('matched');
+            score += 1;
+            document.getElementById('score').textContent = `积分：${score}`;
+            
+            const messages = [
+                "不错！继续加油！",
+                "太棒了！",
+                "完美匹配！",
+                "地理小达人！",
+                "势如破竹！"
+            ];
+            document.getElementById('message').textContent = 
+                messages[Math.min(score-1, messages.length-1)];
+        }
+
+        function checkCompletion() {
+            if (document.querySelectorAll('.bubble:not(.matched)').length === 0) {
+                document.getElementById('successMessage').style.display = 'block';
+                document.getElementById('message').textContent = 
+                    `最终得分：${score}！${score > 30 ? '地理大师！' : '继续努力！'}`;
+            }
+        }
+
+        // 初始化游戏
+        initGame();
+    </script>
+</body>
+</html>
